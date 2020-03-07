@@ -9,6 +9,7 @@ BASE_DIR = Path(__file__).parent
 BUILD_DIR = BASE_DIR / "build"
 
 VILLES_FICHIER = get_var("villes", BASE_DIR / "villes.json")
+SVG_FILE = get_var("svg", BASE_DIR / "carte.svg")
 WIDTH = get_var("width", 1000)
 HEIGHT = get_var("height", 10000)
 
@@ -87,13 +88,12 @@ def task_creer_topologie():
 
 def task_creer_carte():
     topology = BUILD_DIR / "topology.json"
-    output = BASE_DIR / "carte.svg"
 
     return {
         "file_dep": [topology],
-        "targets": [output],
+        "targets": [SVG_FILE],
         "actions": [
-            f"node createSVG.mjs --width {WIDTH} --height {HEIGHT} '{topology}' > '{output}'"
+            f"node createSVG.mjs --width {WIDTH} --height {HEIGHT} '{topology}' > '{SVG_FILE}'"
         ],
         "uptodate": [config_changed({"width": WIDTH, "height": HEIGHT})],
     }

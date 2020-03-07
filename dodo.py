@@ -6,12 +6,13 @@ from doit.tools import config_changed
 
 BASE_DIR = Path(__file__).parent
 BUILD_DIR = BASE_DIR / "build"
+VILLES_FICHIER = BASE_DIR / "villes.json"
 
 os.environ["PATH"] = (
     str(BASE_DIR / "node_modules" / ".bin") + os.pathsep + os.environ["PATH"]
 )
 
-with open(BASE_DIR / "villes.json") as f:
+with open(VILLES_FICHIER) as f:
     VILLES = json.load(f)
 
 
@@ -25,16 +26,15 @@ def ensure_dir(dir):
 
 
 def task_create_villes_geojson():
-    input = BASE_DIR / "communes-5m.ndjson"
+    input = BASE_DIR / "communes-centroid.ndjson"
     output = BUILD_DIR / "villes.geojson"
     tableau_liste = ",".join(f'"{v}"' for v in VILLES)
     return {
-        "file_dep": ["villes.json"],
-        "targets": [BUILD_DIR / "villes.geojson"],
+        "file_dep": [VILLES_FICHIER, input],
+        "targets": [output],
         "actions": [
             ensure_dir(BUILD_DIR),
-            f"ndjson-filter '[{tableau_liste}].includes(d.properties.code)' < {input} "
-            """| ndjson-map -r d3=d3-geo '{type: "Feature", geometry: {type: "Point", coordinates: d3.geoCentroid(d)}, properties: {insee: d.properties.code, nom: d.properties.nom}}' """
+            f"ndjson-filter '[{tableau_liste}].includes(d.properties.insee)' < {input} "
             "| ndjson-reduce 'p.features.push(d), p' '{type:\"FeatureCollection\",features:[]}'"
             f"> {output}",
         ],

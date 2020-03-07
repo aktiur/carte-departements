@@ -2,11 +2,15 @@ import json
 import os
 from pathlib import Path
 
+from doit import get_var
 from doit.tools import config_changed
 
 BASE_DIR = Path(__file__).parent
 BUILD_DIR = BASE_DIR / "build"
-VILLES_FICHIER = BASE_DIR / "villes.json"
+
+VILLES_FICHIER = get_var("villes", BASE_DIR / "villes.json")
+WIDTH = get_var("width", 1000)
+HEIGHT = get_var("height", 10000)
 
 os.environ["PATH"] = (
     str(BASE_DIR / "node_modules" / ".bin") + os.pathsep + os.environ["PATH"]
@@ -16,8 +20,6 @@ with open(VILLES_FICHIER) as f:
     VILLES = json.load(f)
 
 
-WIDTH = 1000
-HEIGHT = 1000
 PROJECTION = "d3.geoConicConformal().parallels([44, 49]).rotate([-3, 0])"
 
 
@@ -49,7 +51,7 @@ def task_projection():
         "file_dep": [departements],
         "targets": [projected_departements],
         "actions": [
-            f"geoproject '{PROJECTION}' < {departements} > {projected_departements}"
+            f"geoproject '{PROJECTION}' < '{departements}' > '{projected_departements}'"
         ],
         "uptodate": [config_changed(PROJECTION)],
     }
@@ -60,7 +62,7 @@ def task_projection():
         "name": "villes",
         "file_dep": [villes],
         "targets": [projected_villes],
-        "actions": [f"geoproject '{PROJECTION}' < {villes} > {projected_villes}"],
+        "actions": [f"geoproject '{PROJECTION}' < '{villes}' > '{projected_villes}'"],
         "uptodate": [config_changed(PROJECTION)],
     }
 
@@ -80,4 +82,18 @@ def task_creer_topologie():
             > %(targets)s
         """
         ],
+    }
+
+
+def task_creer_carte():
+    topology = BUILD_DIR / "topology.json"
+    output = BASE_DIR / "carte.svg"
+
+    return {
+        "file_dep": [topology],
+        "targets": [output],
+        "actions": [
+            f"node createSVG.mjs --width {WIDTH} --height {HEIGHT} '{topology}' > '{output}'"
+        ],
+        "uptodate": [config_changed({"width": WIDTH, "height": HEIGHT})],
     }

@@ -11,7 +11,13 @@ BUILD_DIR = BASE_DIR / "build"
 VILLES_FICHIER = get_var("villes", BASE_DIR / "villes.json")
 SVG_FILE = get_var("svg", BASE_DIR / "carte.svg")
 WIDTH = get_var("width", 1000)
-HEIGHT = get_var("height", 10000)
+HEIGHT = get_var("height", 1000)
+
+FILTER_IDF = (
+    '["75", "77", "78", "91", "92", "93", "94", "95"].includes({0}.properties.code)'
+)
+FILTER_CORSE = '["2A", "2B"].includes({0}.properties.code)'
+FILTER_RESTE = f"!({FILTER_IDF} || {FILTER_CORSE})"
 
 os.environ["PATH"] = (
     str(BASE_DIR / "node_modules" / ".bin") + os.pathsep + os.environ["PATH"]
@@ -68,6 +74,10 @@ def task_projection():
     }
 
 
+def show(s):
+    print(s)
+
+
 def task_creer_topologie():
     departements = BUILD_DIR / "projected-departements.geojson"
     villes = BUILD_DIR / "projected-villes.geojson"
@@ -77,11 +87,15 @@ def task_creer_topologie():
         "targets": [BUILD_DIR / "topology.json"],
         "actions": [
             f"""
-            geo2topo "departements={departements}" "villes={villes}" \
-            | topomerge frontieres=departements \
-            | topomerge --mesh -f "a != b" departements=departements \
+            geo2topo "metropoleInt={departements}" "villes={villes}" \
+            | topomerge -f '{FILTER_IDF.format("d")}' "idfExt=metropoleInt" \
+            | topomerge --mesh -f '(a != b) && {FILTER_IDF.format("a")} && {FILTER_IDF.format("b")}' "idfInt=metropoleInt" \
+            | topomerge -f '{FILTER_CORSE.format("d")}' "corseExt=metropoleInt" \
+            | topomerge --mesh -f '(a != b) && {FILTER_CORSE.format("a")} && {FILTER_CORSE.format("b")}' "corseInt=metropoleInt" \
+            | topomerge -f '{FILTER_RESTE.format("d")}' "metropoleExt=metropoleInt" \
+            | topomerge --mesh -f '(a != b) && {FILTER_RESTE.format("a")} && {FILTER_RESTE.format("b")}' "metropoleInt=metropoleInt" \
             > %(targets)s
-        """
+        """.strip()
         ],
     }
 

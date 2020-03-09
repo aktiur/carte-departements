@@ -20,12 +20,7 @@ commander
   .parse(process.argv);
 
 var reader = read(commander.args[0], writeTopology).then(end).catch(abort),
-  writer = write(commander.out),
-  path = d3.geoPath().pointRadius(function (d) {
-    var p = d.properties, v;
-    return p && (v = p["point-radius"] || p.pointRadius) != null ? v : commander.radius;
-  }),
-  render = path;
+  writer = write(commander.out);
 
 
 writer.write(`
@@ -113,6 +108,23 @@ function write(file) {
   };
 }
 
+function renderLayer(name, feature, path) {
+  writer.write(`
+      <g id="${name}">
+        <path d="${path(feature)}" />
+      </g>
+    `);
+}
+
+function renderVilles(name, villes, projection) {
+  const stream = projection.stream({point: (x, y) => writer.write(`<use xlink:href="#ville" x="${x}" y="${y}" />`)});
+
+  writer.write(`<g id="{name}">`);
+  villes.map(v => d3.geoStream(v, stream));
+  writer.write("</g>");
+
+}
+
 
 async function writeTopology(topology) {
   let v;
@@ -120,29 +132,45 @@ async function writeTopology(topology) {
     (p, f) => (p[f] = topojson.feature(topology, topology.objects[f]), p), {}
   );
 
-  const projection = d3.geoIdentity().fitSize([commander.width, commander.height], features.frontieres);
+  const extentMetropole = [[0, 3], [8, 10]];
+  const extentIDF = [[6, 0], [10, 5]];
+  const extentCorse = [[8, 8], [10, 10]];
 
-  path.projection(projection);
+  const interp = ([x, y]) => [(0.05 + 0.9 * x)*commander.width/10, (0.05 + 0.9 * y)*commander.height/10];
+  const genExtent = ([p1, p2]) => [interp(p1), interp(p2)];
 
-  for (let name of ["frontieres", "departements"]) {
+  const projectionMetropole = d3.geoIdentity().fitExtent(genExtent(extentMetropole), features.metropoleExt);
+  const projectionIDF = d3.geoIdentity().fitExtent(genExtent(extentIDF), features.idfExt);
+  const projectionCorse = d3.geoIdentity().fitExtent(genExtent(extentCorse), features.corseExt);
 
-    writer.write(`
-      <g id="${name}">
-        <path d="${render(features[name])}" />
-      </g>
-    `);
-  }
+  const pathMetropole = d3.geoPath(projectionMetropole);
+  const pathIDF = d3.geoPath(projectionIDF);
+  const pathCorse = d3.geoPath(projectionCorse);
 
-  const cityStream = projection.stream({
-    point: (x, y) => writer.write(`<use xlink:href="#ville" x="${x}" y="${y}" />`)
-  });
+  const zoneIDF = ["75", "77", "78", "91", "92", "93", "94", "95"];
+  const zoneCorse = ["2A", "2B", "20"];
 
-  writer.write('<g id="villes">');
+  renderLayer("metropoleInt", features.metropoleInt, pathMetropole);
+  renderLayer("metropoleExt", features.metropoleExt, pathMetropole);
+  renderVilles(
+    "metropoleVilles",
+    features.villes.features.filter(v => !zoneIDF.includes(v.properties.insee.slice(0, 2)) && !zoneCorse.includes(v.properties.insee.slice(0, 2))),
+    projectionMetropole
+  );
 
-  for (let v of features.villes.features) {
-    d3.geoStream(v, cityStream);
-  }
+  renderLayer("corseInt", features.corseInt, pathCorse);
+  renderLayer("corseExt", features.corseExt, pathCorse);
+  renderVilles(
+    "corseVilles",
+    features.villes.features.filter(v => zoneCorse.includes(v.properties.insee.slice(0, 2))),
+    projectionCorse
+  );
 
-  writer.write("</g>");
-
+  renderLayer("idfInt", features.idfInt, pathIDF);
+  renderLayer("idfExt", features.idfExt, pathIDF);
+  renderVilles(
+    "idfVilles",
+    features.villes.features.filter(v => zoneIDF.includes(v.properties.insee.slice(0, 2))),
+    projectionIDF
+  );
 }

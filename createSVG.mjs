@@ -15,6 +15,8 @@ commander
   .option("-f, --fill <value>", "default fill", "none")
   .option("-s, --stroke <value>", "default stroke", "black")
   .option("-r, --radius <value>", "default point radius", 4.5)
+  .option("--vfill <value>", "default fill for cities", "black")
+  .option("--vstroke <value>", "default stroke for cities", "none")
   .parse(process.argv);
 
 var reader = read(commander.args[0], writeTopology).then(end).catch(abort),
@@ -38,7 +40,7 @@ writer.write(`
 >
   <defs>
     <g id="ville">
-      <circle cx="0" cy="0" r="${commander.radius}" />
+      <circle cx="0" cy="0" r="${commander.radius}" fill="${commander.vfill}" stroke="${commander.vstroke}" />
     </g>
   </defs>`.trim()
 );
